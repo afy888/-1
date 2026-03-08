@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>All For You | Professional System</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+    :root { --brand-blue: #1e3a8a; --text-black: #000; --bg-gray: #f0f4f8; }
+    body { margin: 0; font-family: 'Montserrat', sans-serif; background: var(--bg-gray); padding-top: 180px; }
+    
+    /* 核心修复：强制去除打印预览中的文件路径、标题和页码 */
+    @media print {
+        @page { size: A4; margin: 0; }
+        html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
+        .top-fixed-wrapper, .gallery, .status-panel { display: none !important; }
+        .preview-section { display: block !important; background: transparent !important; padding: 0 !important; }
+        .page { margin: 0 !important; box-shadow: none !important; page-break-after: always; height: 296.5mm; }
+    }
+
+    /* 顶部导航控制台 */
+    .top-fixed-wrapper { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; background: #fff; border-bottom: 1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    .company-header { padding: 20px 40px; display: flex; align-items: center; gap: 25px; }
+    .header-logo { height: 75px; object-fit: contain; }
+    .company-info p { margin: 5px 0 0; font-size: 13px; color: #000; font-weight: 600; }
+    .main-console { padding: 15px 40px; text-align: center; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: center; gap: 10px; }
+    
+    .btn { padding: 12px 24px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; transition: 0.3s; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .btn-primary { background: var(--brand-blue); color: #fff; }
+    .btn-gold { background: #DAA520; color: #fff; }
+    .btn-danger { background: #ef4444; color: #fff; }
+
+    /* 缺失图片报告面板 */
+    .status-panel { max-width: 1650px; margin: 20px auto; padding: 0 40px; display: none; }
+    .status-box { background: #fff; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+    .match-title { font-size: 18px; font-weight: 900; color: var(--brand-blue); margin-bottom: 10px; }
+    .missing-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .missing-item { background: #fee2e2; color: #ef4444; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 800; border: 1px solid #fecaca; }
+
+    /* 5列画廊布局 */
+    .gallery { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; padding: 20px 40px 40px; max-width: 1650px; margin: 0 auto; }
+    .card { background: #fff; padding: 12px; border-radius: 15px; cursor: pointer; text-align: center; border: 1px solid rgba(0,0,0,0.05); transition: 0.4s cubic-bezier(0.165, 0.84, 0.44, 1); overflow: hidden; }
+    .card:hover { transform: translateY(-8px); border-color: var(--brand-blue); box-shadow: 0 15px 30px rgba(30, 58, 138, 0.15); }
+    .card .img-box { width: 100%; height: 160px; border-radius: 10px; overflow: hidden; background: #f8fafc; }
+    .card img { width: 100%; height: 100%; object-fit: cover; transition: 0.6s ease; }
+    .card:hover img { transform: scale(1.06); }
+    .card-title { font-weight: 800; font-size: 13px; color: #1d428a; margin-top: 15px; text-transform: uppercase; }
+
+    /* PDF 排版样式 */
+    .preview-section { background: #1e293b; padding: 40px 0; display: none; min-height: 100vh; }
+    .page { width: 210mm; height: 296.5mm; background: #fff; margin: 0 auto 15mm; padding: 10mm 15mm; display: flex; flex-direction: column; position: relative; box-sizing: border-box; }
+    
+    /* 页眉补完：地址 + 电话 + 传真 + 邮箱 */
+    .inner-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid var(--brand-blue); padding-bottom: 8px; margin-bottom: 5mm; height: 18mm; box-sizing: border-box; }
+    .cat-title-container { flex: 1; display: flex; justify-content: flex-start; align-items: flex-end; overflow: visible; padding-right: 10mm; }
+    .cat-title-left { font-weight: 900; font-size: 13pt; color: #000; text-transform: uppercase; white-space: nowrap; line-height: 1; transform-origin: left bottom; }
+    
+    .inner-logo-box { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+    .inner-logo { height: 42px; margin-bottom: 2px; }
+    .inner-contact { font-size: 6.8px; color: #475569; font-weight: 700; text-align: right; line-height: 1.2; }
+    
+    /* 封面特定样式 */
+    .cover-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .cover-branding-right { text-align: right; }
+
+    .print-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 78mm); gap: 6mm; }
+    .item-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 6px; display: flex; flex-direction: column; height: 78mm; box-sizing: border-box; overflow: hidden; background: #fff; }
+    .img-container { height: 50mm; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
+    .img-container img { max-height: 100%; max-width: 100%; object-fit: contain; }
+    
+    .info-table { width: 100%; border-collapse: collapse; margin-top: 1mm; }
+    .info-table td { color: #000; font-size: 8.2px; border: 1px solid #f1f5f9; padding: 2px 4px; line-height: 1.1; }
+    
+    .barcode-box { margin-top: auto; height: 10mm; display: flex; align-items: center; gap: 12px; }
+    .upc-text { font-size: 9px; font-weight: 800; color: #000; white-space: nowrap; }
+</style>
+</head>
+<body>
+    <div class="top-fixed-wrapper">
+        <div class="company-header">
+            <img src="logo/afy_logo.jpg" class="header-logo" onerror="this.src='https://via.placeholder.com/150x75?text=AFY+LOGO'">
+            <div class="company-info"><p>61 Willet St. Bldg. PP Passaic, NJ 07055 | Phone: 973 928 3640 | Fax: 973 928 3641 | Email: allforyougoods@gmail.com</p></div>
+        </div>
+        <div class="main-console">
+            <button class="btn btn-primary" onclick="document.getElementById('excelInput').click()">📄 1. Import Excel</button>
+            <button class="btn btn-primary" onclick="document.getElementById('zipInput').click()">🖼️ 2. Sync Images</button>
+            <button class="btn btn-gold" id="btnExport" style="display:none;" onclick="generateFullCatalog()">✨ Export PDF</button>
+            <button class="btn btn-danger" onclick="history.back()">🔄 Back</button>
+            <button class="btn btn-gold" id="btnDownload" style="display:none;" onclick="window.print()">🖨️ Confirm & Save</button>
+            <button class="btn btn-secondary" id="btnClosePreview" style="display:none;" onclick="closePreview()">🔙 Close</button>
+        </div>
+    </div>
+
+    <div class="status-panel" id="statusPanel">
+        <div class="status-box">
+            <div id="matchStats" style="font-size:18px; font-weight:900; color:var(--brand-blue);"></div>
+            <div class="missing-list" id="missingList"></div>
+        </div>
+    </div>
+
+    <div class="gallery" id="gallery"></div>
+    <div class="preview-section" id="previewSection"><div id="previewArea"></div></div>
+    <input type="file" id="excelInput" hidden accept=".xlsx,.xls,.csv"><input type="file" id="zipInput" hidden accept=".zip">
+
+<script>
+    const STANDARD_CATS = ["SEASONAL ITEMS", "GLASS PRODUCTS", "TABLEWARE (MUG+BOWL+PLATE)", "KITCHEN", "BATHROOM", "MAT", "WE CRAFT", "HARDWARE", "WINDOW CURTAIN", "WINDOW ACCESSORIES", "BEDDING", "PLASTIC PRODUCTS", "CLEANING ITEMS", "TRASH CAN", "METAL RACKS", "HANGERS AND HOOKS", "TABLE RELATED", "TOY", "HOUSEHOLD ELECTRIC APPLIANCES", "CLOCK", "MULTI-PURPOSE MAT AND ADHESIVE", "HOME ORGANIZER ITEMS", "SHOPPING CARTS AND BAGS", "STORE RACKS HOOKS AND BASKETS", "PET ITEMS", "MIRROR", "UMBRELLA AND RAIN COAT", "ALL FOR YOU FINAL SALES-NO RETURN"];
+    let products = []; let imageMap = new Map(); let activeCats = [...STANDARD_CATS];
+
+    function cleanStr(s) { return String(s || "").trim().toLowerCase(); }
+
+    function renderGallery() {
+        document.getElementById('gallery').innerHTML = activeCats.map(c => {
+            const count = products.filter(p => p.CATEGORY === c).length;
+            const jpgPath = `category_images/${c}.jpg`; const pngPath = `category_images/${c}.png`;
+            return `<div class="card" onclick="autoPreview('${c}')"><div class="img-box"><img src="${jpgPath}" onerror="if(this.src.toLocaleLowerCase().endsWith('.jpg')){this.src='${pngPath}';}else{this.src='https://via.placeholder.com/260x180?text=${c.substring(0,10)}';}"></div><div class="card-title">${c}</div><div style="color:var(--brand-blue); font-size:11px; margin-top:5px; font-weight:700;">${count} ITEMS</div></div>`;
+        }).join('');
+    }
+
+    excelInput.onchange = async e => {
+        const wb = XLSX.read(new Uint8Array(await e.target.files[0].arrayBuffer()), {type:'array'});
+        const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""});
+        products = raw.map(p => ({...p, CATEGORY: STANDARD_CATS.includes(String(p.CATEGORY).trim().toUpperCase()) ? String(p.CATEGORY).trim().toUpperCase() : "OTHERS"}));
+        activeCats = STANDARD_CATS.filter(c => products.some(p => p.CATEGORY === c));
+        if(products.some(p => p.CATEGORY === "OTHERS")) activeCats.push("OTHERS");
+        document.getElementById('btnExport').style.display='inline-block'; renderGallery();
+    };
+
+    zipInput.onchange = async e => {
+        const files = fflate.unzipSync(new Uint8Array(await e.target.files[0].arrayBuffer()));
+        for(let f in files) {
+            if(!f.match(/\.(jpg|png|webp|jpeg)$/i)) continue;
+            const name = f.split('/').pop().toLowerCase().replace(/\.[^/.]+$/,"");
+            const reader = new FileReader();
+            reader.onload = evt => { imageMap.set(name, evt.target.result); imageMap.set(name.replace(/\s+/g,''), evt.target.result); updateSyncReport(); renderGallery(); };
+            reader.readAsDataURL(new Blob([files[f]]));
+        }
+    };
+
+    function updateSyncReport() {
+        let matched = 0; let missing = [];
+        products.forEach(p => { if(imageMap.has(cleanStr(p.ITEM))) matched++; else missing.push(p.ITEM); });
+        document.getElementById('statusPanel').style.display = 'block';
+        document.getElementById('matchStats').innerHTML = `✅ Image Synchronized: ${matched} / ${products.length}`;
+        document.getElementById('missingList').innerHTML = [...new Set(missing)].map(m => `<div class="missing-item">${m}</div>`).join('');
+    }
+
+    /* 异步分片加载补完 */
+    async function generateFullCatalog() {
+        const area = document.getElementById('previewArea'); area.innerHTML = ""; openPreview();
+        for(let cat of activeCats) {
+            const list = products.filter(p => p.CATEGORY === cat);
+            if(list.length) { renderCatBlock(cat, list, area); await new Promise(r => setTimeout(r, 60)); }
+        }
+        drawBarcodes();
+    }
+
+    function renderCatBlock(cat, list, area) {
+        const jpgPath = `category_images/${cat}.jpg`; const pngPath = `category_images/${cat}.png`;
+        
+        // 1. 封面补齐 Fax, Phone, Email
+        area.insertAdjacentHTML('beforeend', `<div class="page">
+            <div class="cover-header">
+                <img src="logo/afy_logo.jpg" style="height:28mm;">
+                <div class="cover-branding-right">
+                    <div style="font-size:11pt; color:#334155; font-weight:600;">61 Willet St. Bldg. PP Passaic, NJ 07055</div>
+                    <div style="font-size:11pt; color:#334155; font-weight:600;">
+                        Phone: 973 928 3640 | Fax: 973 928 3641<br>
+                        Email: allforyougoods@gmail.com
+                    </div>
+                </div>
+            </div>
+            <div style="width:100%; height:3.5px; background:#1d428a; margin: 5mm 0 15mm;"></div>
+            <div style="font-size:42pt; color:#1d428a; margin:10mm 0 35mm; font-weight:800; text-align:center; text-transform:uppercase;">${cat}</div>
+            <img src="${jpgPath}" style="width:175mm; height:110mm; object-fit:cover; border-radius:20px; align-self:center;" onerror="if(this.src.toLocaleLowerCase().endsWith('.jpg')){this.src='${pngPath}';}else{this.style.opacity='0';}">
+        </div>`);
+
+        for(let i=0; i<list.length; i+=6) {
+            const chunk = list.slice(i, i+6);
+            // 2. 内页补齐 Fax, Phone, Email
+            area.insertAdjacentHTML('beforeend', `<div class="page">
+                <div class="inner-header">
+                    <div class="cat-title-container"><span class="cat-title-left" id="title-${cat}-${i}">${cat}</span></div>
+                    <div class="inner-logo-box">
+                        <img src="logo/afy_logo.jpg" class="inner-logo">
+                        <div class="inner-contact">
+                            61 Willet St. Bldg. PP Passaic, NJ 07055<br>
+                            Phone: 973 928 3640 | Fax: 973 928 3641<br>
+                            Email: allforyougoods@gmail.com
+                        </div>
+                    </div>
+                </div>
+                <div class="print-grid">${chunk.map(p => {
+                const img = imageMap.get(cleanStr(p.ITEM)) || "";
+                const priceVal = (p.PRICE !== undefined && p.PRICE !== "") ? `$${p.PRICE}` : "";
+                return `<div class="item-card">
+                    <div class="img-container"><img src="${img}"></div>
+                    <table class="info-table">
+                        <tr><td style="font-weight:700; width:30%;">ITEM#</td><td>${p.ITEM||""}</td></tr>
+                        <tr><td style="font-weight:700;">DESC</td><td>${p.DESC||""}</td></tr>
+                        <tr><td style="font-weight:700;">PCS/CTN</td><td>${p["PCS/CTN"]||p.PCS||""}</td></tr>
+                        <tr><td style="font-weight:700;">PRICE</td><td style="font-weight:800; color:#000;">${priceVal}</td></tr>
+                    </table>
+                    <div class="barcode-box"><div class="upc-text">UPC: ${p.BARCODE||""}</div><svg class="barcode-svg" data-code="${p.BARCODE||""}"></svg></div>
+                </div>`
+            }).join('')}</div></div>`);
+            setTimeout(() => { const el = document.getElementById(`title-${cat}-${i}`); if (el && el.scrollWidth > el.parentElement.clientWidth) el.style.transform = `scale(${el.parentElement.clientWidth / el.scrollWidth * 0.95})`; }, 10);
+        }
+    }
+
+    function openPreview() { document.getElementById('previewSection').style.display = 'block'; document.getElementById('gallery').style.display = 'none'; document.getElementById('statusPanel').style.display = 'none'; document.getElementById('btnDownload').style.display = 'inline-block'; document.getElementById('btnClosePreview').style.display = 'inline-block'; }
+    function closePreview() { document.getElementById('previewSection').style.display = 'none'; document.getElementById('gallery').style.display = 'grid'; document.getElementById('statusPanel').style.display = 'block'; document.getElementById('btnDownload').style.display = 'none'; document.getElementById('btnClosePreview').style.display = 'none'; }
+    function autoPreview(cat) { const list = products.filter(p => p.CATEGORY === cat); if(!list.length) return; const area = document.getElementById('previewArea'); area.innerHTML = ""; openPreview(); renderCatBlock(cat, list, area); drawBarcodes(); }
+    function drawBarcodes() { document.querySelectorAll('.barcode-svg').forEach(s => { try { if(s.dataset.code) JsBarcode(s, s.dataset.code, {height:18, width:1.0, displayValue: false, margin:0}); } catch(e) {} }); }
+    renderGallery();
+</script>
+</body>
+</html>
